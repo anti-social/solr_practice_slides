@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+		<meta charset="utf-8">
+
+		<title>Solr - practice</title>
+
+		<meta name="description" content="An advanced search engine">
+		<meta name="author" content="Alexander Koval">
+
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+		<link rel="stylesheet" href="css/reveal.min.css">
+		<link rel="stylesheet" href="css/theme/default.css" id="theme">
+
+		<!-- For syntax highlighting -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+        <style>
+            body, .reveal section {
+                font-family: helvetica;
+            }
+            .reveal section p, .reveal section div, .reveal section ul {
+                text-align: left;
+            }
+            .reveal section p, .reveal section div {
+                margin-bottom: 30px;
+            }
+            .reveal section ul {
+                display: block;
+            }
+        </style>
+
+		<!-- If the query includes 'print-pdf', use the PDF print sheet -->
+		<script>
+			document.write( '<link rel="stylesheet" href="css/print/' + ( window.location.search.match( /print-pdf/gi ) ? 'pdf' : 'paper' ) + '.css" type="text/css" media="print">' );
+		</script>
+
+		<!--[if lt IE 9]>
+		<script src="lib/js/html5shiv.js"></script>
+		<![endif]-->
+	</head>
+
+	<body>
+
+		<div class="reveal">
+
+			<!-- Any section element inside of this container is displayed as a slide -->
+			<div class="slides">
+                <section>
+                    <h1>solr practice</h1>
+                    <p>
+                        <br>
+                    </p>
+                </section>
+                
+                <section>
+                    <h2>are you searching?</h2>
+                      <img src="http://pcdn.500px.net/6126017/bf5bb58d6c6422f6f2f875cdff6d2edf27c4b515/4.jpg" height="452" width="675">
+                </section>
+
+                <section>
+                    <h2>do you need solr?</h2>
+                    <div>
+                        Вожможно вам не нужен Solr:
+                        <ul>
+                            <li>вам нужен <b>исключетельно</b> полнотекстовый поиск</li>
+                            <li>у вас нет еще одного сервера</li>
+                            <li>у вас патологическая нелюбовь к Java</li>
+                        </ul>
+                    </div>
+                </section>
+                
+                <section>
+                    <section>
+                        <h2>search</h2>
+                        <div>
+                            <pre><code class="q no-highlight">q=Удар ногой с разворота&amp;rows=20</code></pre>
+                            <pre><code class="python">searcher = SolrSearcher("http://localhost:8983/solr")
+search_query = searcher.search(u"Удар ногой с разворота").limit(20)
+for doc in search_query:
+    print doc.id, doc.title</code></pre>
+                        </div>
+                        <p>
+                            По умолчанию Solr возвращает 10 документов
+                        </p>
+                    </section>
+                    <section>
+                        <h2>DIsmax &amp; edismax</h2>
+                        <p>
+                            <a href="http://wiki.apache.org/solr/DisMaxQParserPlugin">http://wiki.apache.org/solr/DisMaxQParserPlugin</a>
+                            <a href="http://wiki.apache.org/solr/ExtendedDisMax">http://wiki.apache.org/solr/ExtendedDisMax</a>
+                        </p>
+                        <div>
+                            <pre><code class="q no-highlight">q=приключения буратино&amp;defType=edismax&amp;qf=title^5 description</code></pre>
+                            <pre><code class="q no-highlight">q={edismax qf='title^5 description'}приключения буратино</code></pre>
+                            <br>
+                            <pre><code class="python">search_query = film_searcher.search(u'приключения буратино')
+search_query = (
+    search_query
+    .edismax()
+    .field_weight('title', 5)
+    .field_weight('description'))</code></pre>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>dismax &amp; edismax</h2>
+                        <div>
+                            <ul>
+                                <li>
+                                    mm - минимальное кол-во совпадений
+                                    <pre><code class="q no-highlight">mm=2
+mm=100%
+mm=3<-1 5<80%</code></pre>
+                                </li>
+                                <li>
+                                    pf - поиск по фразе (список полей как в qf)
+                                </li>
+                                <li>
+                                    ps - расстояние между словами в фразе; указывайте 2, для поиска "перевернутых" фраз
+                                </li>
+                                <li>
+                                    bf - функция повышения "скора"
+                                    <pre><code class="q no-highlight">bf=linear(field,10,5)
+bf=recip(ms(NOW,date_created),3.16e-11,1,1)</code></pre>
+                                </li>
+                            </ul>
+                        </div>
+                        <p>
+                            Следующий запрос ничего не вернет:
+                            <pre><code class="q no-highlight">q=tag:1234&amp;defType=dismax</code></pre>
+                        </p>
+                    </section>
+                    <section>
+                        <h2>subqueries</h2>
+                        <p>
+                            <a href="http://wiki.apache.org/solr/Join">http://wiki.apache.org/solr/Join</a>
+                        </p>
+                        <div>
+                            Найти все родительские группы для групп в названии которых есть "посуда":
+                            <pre><code class="q no-highlight">q={!join from=parent_id to=id}name:посуда</code></pre>
+                            <pre><code class="python">
+group_searcher.search(
+    u'посуда',
+    _local_params=LocalParams(
+        {'type': 'join', 'from': 'parent_id', 'to': 'id'}))</code></pre>
+                            Аналогично найти все дочерние группы:
+                            <pre><code class="q no-highlight">q={!join from=id to=parent_id}name:посуда</code></pre>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>subqueries</h2>
+                        <p>
+                            Найти все товары удовлетворяющие запросу "ipod"
+                            и оставить только товары, в названии производителей которых есть "Belkin" или "Apple"
+                        </p>
+                        <pre><code class="q no-highlight">q=ipod&amp;fq={!join from=id to=manu_id}(name:Belkin OR name:Apple)</code></pre>
+                        <pre><code class="python">
+product_searcher.search(u'ipod') \
+.filter(
+    name__in=["Belkin", "Apple"],
+    _local_params=LocalParams(
+        {'type': 'join', 'from': 'id', 'to': 'manu_id'}))</code></pre>
+                    </section>
+                    <section>
+                        <h2>nested queries</h2>
+                        <pre><code class="q no-highlight">q=_query_:"{!dismax qf='title1 title2 title3' v=$q1}"
+  AND _query_:"{!dismax qf='author1 author2' v=$q2}"
+&amp;q1=Constructivism
+&amp;q2=Dueber</code></pre>
+                        <pre><code class="python">
+book_searcher.search(
+    X(_query_=LocalParams(
+        "dismax", qf="title1 title2 title3", v="$q1")) &
+    X(_query_=LocalParams(
+        "dismax", qf="author1 author2 author3", v="$q2"))) \
+.q1("Constructivism")
+.q2("Dueber")</code></pre>
+                    </section>
+                </section>
+                
+                <section>
+                    <section>
+                        <h2>filtering</h2>
+                        <div>
+                            <pre><code class="q no-highlight">fq=category:13&amp;fq=in_stock:true</code></pre>
+                            <pre><code class="python">search_query.filter(category=13).filter(in_stock=True)</code></pre>
+                        </div>
+                        <div>
+                            <pre><code class="q no-highlight">fq=price:[* TO 100]&amp;fq=popularity:{1 TO 7}</code></pre>
+                            <pre><code class="python">search_query.filter(price__lte=100).filter(popularity__between=[1, 7])</code></pre>
+                        </div>
+                        <div>
+                            <pre><code class="q no-highlight">fq=price:[* TO *]&amp;fq=date_created:[NOW/DAY-1MONTH TO *]</code></pre>
+                            <pre><code class="python">search_query.filter(price__isnull=False) \
+.filter(date_created="NOW/DAY-1MONTH")</code></pre>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>filtering</h2>
+                        <div>
+                            <pre><code class="q no-highlight">fq=(NOT (status:0 OR status:1))</code></pre>
+                            <pre><code class="python">search_query.exclude(status__in=[0, 1])</code></pre>
+                        </div>
+                        <div>
+                            <pre><code class="q no-highlight">fq=(status:0 OR (NOT price:[* TO *]))</code></pre>
+                            <pre><code class="python">search_query.filter(X(status=0) | X(price__isnull=True))</code></pre>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>caching</h2>
+                        <div>
+                            Oтключайте кэширование:
+                            <ul>
+                                <li>
+                                    для редких фильтров
+                                </li>
+                                <li>
+                                    для полей с большим кол-вом значений
+                                </li>
+                                <li>
+                                    для тяжелых фильтров
+                                </li>
+                            </ul>
+                            <pre><code class="q no-highlight">fq={!cache=false}company:1111</code></pre>
+                            Используйте cost для задания порядка применения некэшируемых фильтров:
+                            <pre><code class="q no-highlight">fq={!frange l=1 u=5 cache=false cost=100}
+mul(sqrt(popularity),sqrt(rating))</code></pre>
+                            <pre><code class="python">
+search_query.filter(
+    func.mul(func.sqrt('popularity'), func.sqrt('rating')),
+    _local_params=LocalParams('frange', l=1, u=5,
+                              cache=False, cost=100))</code></pre>
+                        </div>
+                    </section>
+                </section>
+                
+                <section>
+                    <section>
+                        <h2>Facets</h2>
+                        <div>
+                            <pre><code class="q no-highlight">facet=true&amp;facet.limit=10&amp;facet.mincount=1</code></pre>
+                            <ul>
+                                <li>
+                                    Фасет по полю
+                                    <pre><code class="q no-highlight">facet.field=category&amp;f.category.limit=20</code></pre>
+                                </li>
+                                <li>
+                                    Фасет для произвольного фильтра
+                                    <pre><code class="q no-highlight">facet.query=date_created:[NOW/DAY TO *]</code></pre>
+                                </li>
+                                <li>
+                                    Фасет по интервалам
+                                    <pre><code class="q no-highlight">facet.range=price&amp;facet.gap=100&amp;
+facet.range.start=0&amp;facet.range.end=1000</code></pre>
+                                </li>
+                                <li>
+                                    Иерархические фасеты
+                                    <pre><code class="q no-highlight">facet.pivot=type,category</code></pre>
+                                    Поддержка локальных параметров в 4.1 (<a href="https://issues.apache.org/jira/browse/SOLR-2255">#SOLR-2255</a>)
+                                </li>
+                            </ul>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>Multi-Select Faceting</h2>
+                        <div>
+                            Возможность выбрать несколько значений одного фильтра:
+                            <pre><code class="q no-highlight">fq={!tag=cat}category:7&amp;facet.field={!ex=cat}category</code></pre>
+                            <pre><code class="q no-highlight">fq={!tag=price}price:[* TO 100]&amp;
+facet.query={!ex=price}price:[* TO 100]&amp;
+facet.query={!ex=price}price:[100.01 TO 200]&amp;
+facet.query={!ex=price}price:[200.01 TO *]</code></pre>
+                        </div>
+                    </section>
+                    <!--
+                    <section>
+                        <h2>facet range</h2>
+                        <div>
+                            Позволяет задать стартовое значение и промежутки для которых 
+                        </div>
+                    </section>
+                    -->
+                    <!--
+                    <section>
+                        <h2>hierarcical facets</h2>
+                        <p>
+                            Поддержка локальных параметров в 4.1 (<a href="https://issues.apache.org/jira/browse/SOLR-2255">#SOLR-2255</a>)
+                        </p>
+                    </section>
+                    -->
+                </section>
+                
+                <section>
+                    <h2>stats</h2>
+                    <p>
+                        Позволяет получить статистику по полю
+                    </p>
+                    <p>
+                        min, max, sum, count, missing, sumOfSquares, mean, stddev
+                    </p>
+                    <pre><code class="q no-highlight">stats=true&amp;stats.field=price</code></pre>
+                    <p>
+                        Не поддерживает local params (<a href="https://issues.apache.org/jira/browse/SOLR-3177">#SOLR-3177</a>)
+                    </p>
+                </section>
+                
+                <section>
+                    <h2>Grouping</h2>
+                    <p>
+                        <a href="http://wiki.apache.org/solr/FieldCollapsing">http://wiki.apache.org/solr/FieldCollapsing</a>
+                    <p>
+                    <p>
+                        Группировка документов по полю, результату функции или query:
+                    </p>
+                    <pre><code class="q no-highlight">group=true&amp;group.field=company</code></pre>
+                    <pre><code class="q no-highlight">group=true&amp;group.limit=3&amp;
+group.query=price:[0 TO 99.99]&amp;
+group.query=price:[100 TO *]</code></pre>
+                    <pre><code class="python">
+search_query = search_query.group('company', limit=5)
+grouped = search_query.results.get_grouped('company')
+for group in grouped.groups:
+    print group.value, group.ndocs
+    for doc in group.docs:
+        print doc.id, doc.name
+         </code></pre>
+                </section>
+
+                <section>
+                    <section>
+                        <h2>spatial</h2>
+                        <p>
+                            <a href="http://wiki.apache.org/solr/SpatialSearch">http://wiki.apache.org/solr/SpatialSearch</a>
+                        </p>
+                        <div>
+                            Схема:
+                            <pre><code class="xml">&lt;types&gt;
+  &lt;fieldType name="latlon" class="solr.LatLonType"
+             subFieldSuffix="_coordinate"/&gt;
+&lt;/types&gt;
+
+&lt;fields&gt;
+  &lt;field name="location" type="latlon"
+         indexed="true" stored="false"/&gt;
+  &lt;field name="location_0_coordinate" type="tdouble"
+         indexed="true" stored="false"/&gt;
+  &lt;field name="location_1_coordinate" type="tdouble"
+         indexed="true" stored="false"/&gt;
+&lt;/fields&gt;</code></pre>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>spatial</h2>
+                        <div>
+                            <ul>
+                                <li>
+                                    geofilt - фильтрация документов по расстоянию от заданой точки
+                                    <pre><code class="q no-highlight">fq={!geofilt pt=45.15,-93.85 sfield=store d=5}</code></pre>
+                                    <pre><code class="q no-highlight">fq={!geofilt}&amp;pt=45.15,-93.85&amp;sfield=store&amp;d=5</code></pre>
+                                </li>
+                                <li>bbox - ограничивающий "квадрат"</li>
+                                <li>
+                                    geodist - функция расстояния
+                                    <pre><code class="q no-highlight">fq={!geofilt}&amp;pt=45.15,-93.85&amp;sfield=store&amp;d=50&sort=geodist() asc</code></pre>
+                                    <pre><code class="q no-highlight">fl=_dist_:geodist()</code></pre>
+                                    <pre><code class="q no-highlight">bf=recip(geodist(),2,200,20)&amp;sort=score desc</code></pre>
+                                </li>
+                            </ul>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>spatial faceting</h2>
+                        <div>
+                            <pre><code class="q no-highlight">facet.query={!geofilt d=5 key=d5}&amp;facet.query={!geofilt d=20 key=d20}</code></pre>
+                            <pre><code class="q no-highlight">facet.query={!frange l=0 u=5 key=d5}geodist()</code></pre>
+                            frange медленней geofilt
+                        </div>
+                    </section>
+                </section>
+                
+                <section>
+                    <h2>other batteries</h2>
+                    <div>
+                        <ul>
+                            <li>mlt - more like this</li>
+                            <li>highlihgt - подсветка найденного</li>
+                        </ul>
+                    </div>
+                </section>
+                
+                <section>
+                    <section>
+                        <h2>indexing tips</h2>
+                        <div>
+                            <ul>
+                                <li>Переиндексируйте за один раз больше документов</li>
+                                <li>Переиндексируйте в несколько потоков</li>
+                                <li>Используйте очередь на переиндексацию</li>
+                                <li>Не используйте автокоммит</li>
+                            </ul>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>indexing tips</h2>
+                        <div>
+                            Избегайте конкурирующих коммитов:
+                            <pre><code class="python">
+@task(queue='indexing',
+      max_retries=REINDEX_RETRIES,
+      default_retry_delay=REINDEX_RETRY_DELAY)
+def commit_items():
+    with lock(current_task.name, LOCK_TIMEOUT) as aquired
+        if aquired:
+            try:
+                item_searcher.commit()
+            except SolrError, e:
+                current_task.retry(exc=e)</code></pre>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>indexing tips</h2>
+                        <div>
+                            Переиндексация в несколько потоков:
+                            <pre><code class="python">
+@task(queue='indexing')
+def reindex_all_items(_last_id=0, _limit=10000):
+    # construct query
+
+    tasks = []
+    last_id = None
+    for bucket, last_id in make_buckets(query, limit=_limit):
+        tasks.append(reindex_items.si(bucket)
+    chord(tasks)(commit_items.si())
+
+    if last_id:
+        current_task.delay(_last_id=last_id, _limit=_limit)</code></pre>
+                        </div>
+                    </section>
+                </section>
+
+                <section>
+                    <section>
+                        <h2>solar</h2>
+<pre><code code="python" style="max-height:450px">qf = QueryFilter()
+qf.add_filter(
+    FacetFilter('cat', 'category', mincount=1))
+qf.add_filter(
+    RangeFilter('price', 'price_unit',
+                _local_params=LocalParams(cache=False)))
+qf.add_filter(
+    FacetQueryFilter(
+        'date_created',
+        FacetQueryFilterValue(
+            'today',
+            X(date_created__gte='NOW/DAY-1DAY'),
+            title='Only new',
+            help_text='Documents one day later'),
+        FacetQueryFilterValue(
+            'week_ago',
+            X(date_created__gte='NOW/DAY-7DAY'),
+            title='Week ago')))</code></pre>
+                    </section>
+                    <section>
+                        <h2>solar</h2>
+<pre><code code="python" style="max-height:450px">qf.add_filter(
+    FacetQueryFilter(
+        'dist',
+        FacetQueryFilterValue(
+            'd5',
+            None, _local_params=LocalParams('geofilt', d=5)),
+        FacetQueryFilterValue(
+            'd10',
+            None, _local_params=LocalParams('geofilt', d=10)),
+        FacetQueryFilterValue(
+            'd20',
+            None, _local_params=LocalParams('geofilt', d=20)),
+        select_multiple=False))
+qf.add_ordering(
+    OrderingFilter(
+        'sort',
+        OrderingValue('-score', '-score'),
+        OrderingValue('price', 'price'),
+        OrderingValue('-price', '-price')))</code></pre>
+                    </section>
+                    <section>
+                        <h2>solar</h2>
+<pre><code code="python" style="max-height:450px">params = {
+    'cat': ['5', '13'],
+    'price__gte': ['100'],
+    'price__lte': ['200'],
+    'date_created': ['today'],
+    'dist': ['d10'],
+    'sort': ['-price'],
+}
+query = qf.apply(query, params)
+qf.process_results(search_query.results)
+
+for fv in qf.get_filter('cat'):
+    print fv.value, fv.count, fv.selected
+
+price_filter = qf.get_filter('price')
+print price_filter.from_value, price_filter.to_value
+
+print qf.get_filter('dist').get_value('d5').count
+print qf.get_filter('dist').get_value('d5').selected</code></pre>
+                    </section>
+                </section>
+                
+                <section>
+                    <h2>to be continued</h2>
+                    <img src="http://pcdn.500px.net/8442873/006dcee64f82936f3eeb45fbb53ffe80dbae8fed/4.jpg" height="450" width="671">
+                </section>
+                
+                <section>
+                    <section>
+                        <h2>stemming</h2>
+                        <div>
+                            Встроенные:
+                            <ul>
+                                <li>Snowball</li>
+                                <li>Hunspell</li>
+                            </ul>
+                        </div>
+                        <div>
+                            Альтернативные:
+                            <ul>
+                                <li>jmorphy2-solr-stemmer</li>
+                            </ul>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>stemming</h2>
+                        <div>
+                            <pre><code>&lt;fieldType name="text" class="solr.TextField" omitNorms="true"&gt;
+  &lt;analyzer&gt;
+        &lt;!--
+        &lt;charFilter class="solr.MappingCharFilterFactory"
+                    mapping="mapping_ru.txt"/&gt;
+        --&gt;
+        &lt;tokenizer class="solr.WhitespaceTokenizerFactory"/&gt;
+        &lt;filter class="solr.WordDelimiterFilterFactory"
+                generateWordParts="1" generateNumberParts="1"
+                catenateWords="1" catenateNumbers="1" catenateAll="0"/&gt;
+        &lt;filter class="solr.LowerCaseFilterFactory"/&gt;
+        &lt;filter class="solr.StopFilterFactory" words="stopwords.txt"/&gt;
+        &lt;filter class="solr.SynonymFilterFactory" synonyms="syn.txt"
+                ignoreCase="false" expand="true"/&gt;
+        &lt;!-- Стеммер --&gt;
+    &lt;/analyzer&gt;
+&lt;/fieldType&gt;<br></code></pre>
+                        </div>
+                    </section>
+                </section>
+                
+                <section>
+                    <section>
+                        <h2>snowball</h2>
+                        <div>
+                            Плюсы:
+                            <ul>
+                                <li>очень быстрый</li>
+                                <li>отсутствие словаря</li>
+                            </ul>
+                        </div>
+                        <div>
+                            Минусы:
+                            <ul>
+                                <li>
+                                    слишком много брака:<br>
+                                    &nbsp;&nbsp;&nbsp;&nbsp; перила &rarr; пер;&nbsp; перо &rarr; пер;<br>
+                                    &nbsp;&nbsp;&nbsp;&nbsp; чернила &rarr; черн;&nbsp; черный &rarr; черн<br>
+                                    &nbsp;&nbsp;&nbsp;&nbsp; платье &rarr; плат;&nbsp; плата &rarr; плат<br>
+                                    &nbsp;&nbsp;&nbsp;&nbsp; улей &rarr; ул
+                                </li>
+                                <li>отутствие словаря (невозможно исправить брак)</li>
+                            </ul>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>snowball</h2>
+                        <div>
+                            <pre><code>
+&lt;filter class="solr.SnowballPorterFilterFactory"
+        language="Russian"/&gt;</code></pre>
+                        </div>
+                    </section>
+                </section>
+                
+                <section>
+                    <section>
+                        <h2>hunspell</h2>
+                        <div>
+                            Плюсы:
+                            <ul>
+                                <li>более лучше snowball???</li>
+                                <li>поддержка большого количества языков</li>
+                            </ul>
+                        </div>
+                        <div>
+                            Минусы:
+                            <ul>
+                                <li>размер <u>правил</u> ~6 Мб</li>
+                                <li>медленный, реально медленный</li>
+                                <li>
+                                    проблемы стемминга:<br>
+                                    &nbsp;&nbsp;&nbsp;&nbsp; корова &rarr; корь, кора, корова<br>
+                                    &nbsp;&nbsp;&nbsp;&nbsp; ультрабук &rarr; бук
+                                </li>
+                            </ul>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>hunspell</h2>
+                        <div>
+                            <pre><code>
+&lt;filter class="solr.HunspellStemFilterFactory"
+        affix="ru_RU.aff"
+        dictionary="ru_RU.dic"/&gt;</code></pre>
+                        </div>
+                    </section>
+                </section>
+                <section>
+                    <section>
+                        <h2>pymorphy2</h2>
+                        <div>
+                            Плюсы:
+                            <ul>
+                                <li>быстрый, достаточно быстрый</li>
+                                <li>основан на словаре</li>
+                                <li>
+                                    поддержка неизвестных слов<br>
+                                    &nbsp;&nbsp;&nbsp;&nbsp;лошарики &rarr; лошарик
+                                </li>
+                                <li>
+                                    замены букв на ходу ("e" &rarr; "ё", "c" (цэ) &rarr; "с" (эс))
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            Минусы
+                            <ul>
+                                <li>размер словаря ~10 Mb</li>
+                                <li>только русский язык</li>
+                            </ul>
+                        </div>
+                    </section>
+                    <section>
+                        <h2>pymorphy2 config</h2>
+                        <div>
+                            <pre><code class="xml">
+&lt;filter class="com.uaprom.stemmer.DictionaryStemFilterFactory"
+    dictionaryClass="com.uaprom.stemmer.pymorphy2.Pymorphy2Dictionary"
+    pymorphy2DBPath="dict"
+    pymorphy2Replaces="replaces.json"/&gt;</code></pre>
+
+                            <p>
+                                replaces.json:
+                            </p>
+                            <pre><code>{
+    "е": "ё"
+}</code></pre>
+                        </div>
+                    </section>
+                </section>
+                
+                <section>
+                    <h2>benchmarks</h2>
+                    <p>
+                        Время переиндексации 1000 документов (68 000 слов):
+                    </p>
+                    <table>
+                        <tr>
+                            <td style="width:250px">Snowball</td>
+                            <td>0,3с</td>
+                        </tr>
+                        <tr>
+                            <td>Hunspell</td>
+                            <td>150с</td>
+                        </tr>
+                        <tr>
+                            <td>Pymorphy2</td>
+                            <td>1,3с</td>
+                        </tr>
+                    </table>
+                </section>
+                
+                <section>
+                    <h2>production</h2>
+                    <div>
+                        <ul>
+                            <li>3.5 млн документов в индексе</li>
+                            <li>5 Гб на диске</li>
+                            <li>до 6 Гб в оперативной памяти</li>
+                            <li>80 запросов в секунду</li>
+                            <li>среднее время ответа - 30 мс</li>
+                            <li>10 запросов в секунду с временем ответа &gt; 100 мс</li>
+                            <li>1 мастер (запись), 3 слейва (чтение), rsync каждые 10 минут</li>
+                            <li>полная переиндексация ~4 часа</li>
+                        </ul>
+                        <p>
+                            Примерно то же самое для России
+                        </p>
+                    </div>
+                </section>
+                
+                <section>
+                    <h2>tips</h2>
+                    <div>
+                        <ul>
+                            <li>
+                                посчитайте filterCache; filterCache должен быть больше, чем кол-во различных фильтров fq
+                            </li>
+                            <li>
+                                не используйте динамические multiValued поля
+                            </li>
+                            <li>
+                                рестартуйте Solr при изменении схемы, если используете tomcat
+                            </li>
+                            <li>
+                                не читайте из Solr'а, в который пишете
+                            </li>
+                            <li>
+                                направляйте похожие запросы на один Solr
+                            </li>
+                            <li>
+                                оптимизируйте ваш paginator (не делайте 2 запроса)
+                            </li>
+                            <li>
+                                не выделяйте слишком много памяти -Xmx примерно равен размеру индекса
+                            </li>
+                            <li>
+                                при небольших нагрузках уменьшите -XX:CompileThreshold
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+                
+                <section>
+                    <h2>the end</h2>
+                    <pre><code class="q no-highlight">debugQuery=true</code></pre>
+                    <img src="http://pcdn.500px.net/6483554/9fc6adc6519b402765943cfb0d708b5912dbf07e/4.jpg" height="448" width="668">
+                </section>
+                
+                <section>
+                    <h2>links</h2>
+                    <div>
+                        <ul>
+                            <li>
+                                <a href="http://lucene.apache.org/solr/">http://lucene.apache.org/solr/</a>
+                            </li>
+                            <li>
+                                <a href="http://wiki.apache.org/solr/">http://wiki.apache.org/solr/</a>
+                            </li>
+                            <li>
+                                <a href="https://github.com/anti-social/solar">https://github.com/anti-social/solar</a>
+                            </li>
+                            <li>
+                                <a href="http://solar.readthedocs.org/">http://solar.readthedocs.org/</a>
+                            </li>
+                            <li>
+                                <a href="https://github.com/kmike/pymorphy2">https://github.com/kmike/pymorphy2</a>
+                            </li>
+                            <li>
+                                <a href="https://github.com/anti-social/jmorphy2-solr-stemmer">https://github.com/anti-social/jmorphy2-solr-stemmer</a>
+                            </li>
+                            <li>
+                                <a href="http://opencorpora.org/">http://opencorpora.org/</a>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+			</div>
+
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.min.js"></script>
+
+		<script>
+
+			// Full list of configuration options available here:
+			// https://github.com/hakimel/reveal.js#configuration
+			Reveal.initialize({
+			controls: true,
+			progress: true,
+			history: true,
+			center: true,
+
+			theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+			transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/none
+
+			// Optional libraries used to extend on reveal.js
+			dependencies: [
+			{ src: 'lib/js/classList.js', condition: function() { return !document.body.classList; } },
+			{ src: 'plugin/markdown/showdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+			{ src: 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+			{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+			{ src: 'plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+			{ src: 'plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+			// { src: 'plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+
+            { src: 'plugin/jquery/jquery-1.9.0.min.js', async: true}
+			]
+			});
+
+            Reveal.addEventListener("ready", function (event) {
+                $("pre code.q").each(function () {
+                    var content = $(this).html();
+                    content = content
+                    .replace(/([\w\.]+)=/g, '<span class="input_number">$1</span>=')
+                    .replace(/('.*?')/g, '<span class="string">$1</span>')
+                    .replace(/&amp;/g, '<span class="comment">&amp;</span>');
+                    $(this).html(content);
+                });
+            });
+
+		</script>
+
+	</body>
+</html>
